@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Polished Quiz App — JavaScript</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#7c3aed;--success:#16a34a;--danger:#ef4444;--glass:rgba(255,255,255,0.04)}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial; margin:0; background:linear-gradient(180deg,#071024 0%, #0b1220 100%); color:#e6eef8; display:flex; align-items:center; justify-content:center; padding:32px}
+    .app{width:100%; max-width:920px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:18px}
+    h1{font-size:20px; margin:0}
+    .meta{color:var(--muted); font-size:13px}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:14px; padding:20px; box-shadow:0 6px 20px rgba(2,6,23,0.6);}
+
+    .controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    button, .btn{background:var(--glass); color:inherit; border:1px solid rgba(255,255,255,0.04); padding:8px 12px; border-radius:10px; font-weight:600; cursor:pointer}
+    button.primary{background:linear-gradient(90deg,var(--accent),#4f46e5); border:none}
+    button.ghost{background:transparent; border:1px dashed rgba(255,255,255,0.04)}
+    .layout{display:grid; grid-template-columns: 1fr 320px; gap:20px}
+
+    /* Quiz panel */
+    .quiz-panel{min-height:320px}
+    .question{font-size:18px; margin-bottom:8px}
+    .meta-row{display:flex; gap:12px; align-items:center; color:var(--muted); font-size:13px}
+
+    .answers{display:flex; flex-direction:column; gap:10px; margin-top:16px}
+    .answer{background:rgba(255,255,255,0.02); padding:12px 14px; border-radius:10px; border:1px solid transparent; cursor:pointer; transition:all 160ms}
+    .answer:hover{transform:translateY(-3px)}
+    .answer.correct{background:linear-gradient(90deg,#073b20, rgba(16,185,129,0.06)); border-color:rgba(16,185,129,0.18); box-shadow:0 6px 20px rgba(16,185,129,0.06)}
+    .answer.incorrect{background:linear-gradient(90deg,#3b0710, rgba(239,68,68,0.04)); border-color:rgba(239,68,68,0.12)}
+    .answer .label{font-weight:600}
+    .answer .explain{margin-top:6px; color:var(--muted); font-size:13px}
+
+    .progress{height:10px; background:rgba(255,255,255,0.03); border-radius:999px; overflow:hidden}
+    .progress > i{display:block; height:100%; background:linear-gradient(90deg,var(--accent), #06b6d4); width:0%}
+
+    /* Sidebar */
+    .sidebar{display:flex; flex-direction:column; gap:12px}
+    .panel{padding:14px; border-radius:10px; background:rgba(255,255,255,0.02)}
+    .stats{display:flex; gap:10px; align-items:center; justify-content:space-between}
+    .big{font-size:22px; font-weight:700}
+
+    footer{margin-top:14px; color:var(--muted); font-size:13px; text-align:center}
+
+    /* responsive */
+    @media (max-width:920px){.layout{grid-template-columns:1fr;}.sidebar{order:2}}
+
+    /* small utilities */
+    input[type=file]{display:none}
+    .kbd{background:#07102a;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);font-weight:700}
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Polished Quiz App</h1>
+        <div class="meta">Instant feedback • Dynamic question loading • Score tracking</div>
+      </div>
+      <div class="controls">
+        <label class="btn" title="Load questions from a JSON file">
+          Load JSON
+          <input id="fileLoader" type="file" accept="application/json">
+        </label>
+        <button id="addSample" class="btn">Add Sample Questions</button>
+        <button id="resetBank" class="btn ghost">Reset Bank</button>
+        <button id="toggleShuffle" class="btn">Shuffle: Off</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <main class="card quiz-panel">
+        <div class="meta-row">
+          <div id="qIndex">Question 0 / 0</div>
+          <div id="timer" style="margin-left:auto; display:none">Time: <span id="timeLeft">0</span>s</div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="progress" aria-hidden><i id="progFill"></i></div>
+
+        <div style="height:18px"></div>
+
+        <div id="questionArea">
+          <div id="questionText" class="question">Click "Add Sample Questions" or load a JSON to begin.</div>
+          <div id="choices" class="answers"></div>
+        </div>
+
+        <div style="height:18px"></div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <button id="nextBtn" class="primary" disabled>Next</button>
+          <button id="restartBtn" class="btn ghost">Restart</button>
+          <div style="margin-left:auto; color:var(--muted); font-size:13px">Tip: use <span class="kbd">1</span>-<span class="kbd">4</span> to answer</div>
+        </div>
+
+      </main>
+
+      <aside class="sidebar">
+        <div class="panel">
+          <div style="display:flex; justify-content:space-between; align-items:center">
+            <div>
+              <div class="meta">Score</div>
+              <div class="big" id="score">0</div>
+            </div>
+            <div>
+              <div class="meta">High</div>
+              <div class="big" id="highScore">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+            <div class="meta">Settings</div>
+            <div class="meta">Questions: <span id="bankCount">0</span></div>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-bottom:8px">
+            <label><input id="enableTimer" type="checkbox"> Enable timer</label>
+            <select id="timerSec"><option>10</option><option selected>20</option><option>30</option><option>45</option></select>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-bottom:8px">
+            <button id="showSummary" class="btn">Show Summary</button>
+            <button id="clearScores" class="btn ghost">Clear Scores</button>
+          </div>
+
+          <details>
+            <summary style="cursor:pointer; color:var(--muted)">Add question manually</summary>
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px">
+              <input id="newQText" placeholder="Question text" />
+              <input id="opt1" placeholder="Option 1 (correct)" />
+              <input id="opt2" placeholder="Option 2" />
+              <input id="opt3" placeholder="Option 3" />
+              <input id="opt4" placeholder="Option 4" />
+              <input id="explain" placeholder="Short explanation (optional)" />
+              <div style="display:flex; gap:8px">
+                <button id="addQBtn" class="btn">Add</button>
+                <button id="addAndStart" class="btn primary">Add & Start</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div class="panel">
+          <div class="meta">Session summary</div>
+          <div id="sessionSummary" style="margin-top:8px; color:var(--muted); font-size:13px">No session yet.</div>
+        </div>
+
+      </aside>
+    </div>
+
+    <footer>Built with vanilla JavaScript — open the browser console for simple debugging logs.</footer>
+  </div>
+
+  <script>
+    // --- Quiz engine ---
+    const UI = {
+      qIndex: document.getElementById('qIndex'),
+      questionText: document.getElementById('questionText'),
+      choices: document.getElementById('choices'),
+      nextBtn: document.getElementById('nextBtn'),
+      restartBtn: document.getElementById('restartBtn'),
+      score: document.getElementById('score'),
+      highScore: document.getElementById('highScore'),
+      progFill: document.getElementById('progFill'),
+      bankCount: document.getElementById('bankCount'),
+      fileLoader: document.getElementById('fileLoader'),
+      addSample: document.getElementById('addSample'),
+      resetBank: document.getElementById('resetBank'),
+      toggleShuffle: document.getElementById('toggleShuffle'),
+      enableTimer: document.getElementById('enableTimer'),
+      timerSec: document.getElementById('timerSec'),
+      timerEl: document.getElementById('timer'),
+      timeLeft: document.getElementById('timeLeft'),
+      showSummary: document.getElementById('showSummary'),
+      clearScores: document.getElementById('clearScores'),
+      sessionSummary: document.getElementById('sessionSummary'),
+      addQBtn: document.getElementById('addQBtn'),
+      addAndStart: document.getElementById('addAndStart')
+    };
+
+    // Sample questions
+    const sampleQuestions = [
+      {id:1, q:'Which language runs in a web browser?', choices:['JavaScript','Python','C++','Java'], answer:0, explain:'Browsers execute JavaScript natively.'},
+      {id:2, q:'What does CSS stand for?', choices:['Cascading Style Sheets','Computer Style Sheets','Creative Style System','Control Style Sheet'], answer:0, explain:'CSS stands for Cascading Style Sheets.'},
+      {id:3, q:'Which HTML tag is used for the largest heading?', choices:['h1','h6','heading','title'], answer:0, explain:'<h1> is the largest heading tag.'},
+      {id:4, q:'Which of these is NOT a JavaScript data type?', choices:['Undefined','Number','Float','String'], answer:2, explain:'JavaScript has Number (which covers floats) not a separate "Float" type.'}
+    ];
+
+    // State
+    let questionBank = []; // master bank
+    let activeSet = []; // shuffled/selected
+    let current = 0;
+    let score = 0;
+    let answersLog = [];
+    let shuffle = false;
+    let timerId = null;
+
+    // Helpers
+    function saveHighScore(s){ localStorage.setItem('quiz_high', String(s)); UI.highScore.textContent = s }
+    function loadHighScore(){ const s = Number(localStorage.getItem('quiz_high')||0); UI.highScore.textContent = s }
+    function saveBank(){ localStorage.setItem('quiz_bank', JSON.stringify(questionBank)) }
+    function loadBank(){ const raw = localStorage.getItem('quiz_bank'); if(raw) questionBank = JSON.parse(raw) }
+
+    function setBankCount(){ UI.bankCount.textContent = questionBank.length }
+
+    function resetSession(){ current = 0; score = 0; answersLog = []; UI.score.textContent = score; UI.nextBtn.disabled = true; UI.questionText.textContent = 'Ready? Click Next to start.'; UI.choices.innerHTML = ''; updateProgress(); }
+
+    function updateProgress(){ UI.qIndex.textContent = `Question ${Math.min(current+1, activeSet.length)} / ${activeSet.length}`; const pct = activeSet.length ? Math.round((current / activeSet.length) * 100) : 0; UI.progFill.style.width = pct + '%'; }
+
+    function startQuiz(){ if(questionBank.length===0){ alert('No questions available. Add or load some questions first.'); return }
+      // Build active set
+      activeSet = questionBank.map((q,i)=> ({...q}));
+      if(shuffle) activeSet = shuffleArray(activeSet);
+      current = 0; score = 0; answersLog = []; UI.score.textContent = score; UI.nextBtn.disabled = true; renderQuestion(); updateProgress(); UI.sessionSummary.textContent = 'In progress...';
+    }
+
+    function renderQuestion(){ stopTimer(); if(current >= activeSet.length){ showResult(); return }
+      const q = activeSet[current]; UI.questionText.textContent = q.q; UI.choices.innerHTML=''; UI.nextBtn.disabled = true;
+      // create choices
+      q.choices.forEach((c, idx)=>{
+        const b = document.createElement('button'); b.className='answer'; b.setAttribute('data-idx', idx);
+        b.innerHTML = `<div class="label">${String.fromCharCode(65+idx)}. ${escapeHtml(c)}</div><div class="explain" style="display:none"></div>`;
+        b.addEventListener('click', ()=> onSelect(b, idx));
+        UI.choices.appendChild(b);
+      });
+      updateProgress();
+      // start timer if enabled
+      if(UI.enableTimer.checked){ startTimer(Number(UI.timerSec.value)); UI.timerEl.style.display='inline-block' } else { UI.timerEl.style.display='none' }
+    }
+
+    function onSelect(button, idx){ if(button.classList.contains('disabled')) return; // prevent double clicks
+      const q = activeSet[current]; const correct = idx === q.answer; collectAnswer(q, idx, correct);
+      // reveal feedback
+      Array.from(UI.choices.children).forEach((el, i)=>{
+        el.classList.add('disabled');
+        const explainEl = el.querySelector('.explain');
+        if(i === q.answer){ el.classList.add('correct'); explainEl.style.display='block'; explainEl.textContent = q.explain || '' }
+        if(i === idx && idx !== q.answer){ el.classList.add('incorrect'); explainEl.style.display='block'; explainEl.textContent = q.explain || '' }
+      });
+      UI.nextBtn.disabled = false; stopTimer();
+    }
+
+    function collectAnswer(q, selectedIdx, correct){ answersLog.push({id:q.id, q:q.q, selected:selectedIdx, correct: q.answer}); if(correct){ score += 1; UI.score.textContent = score } UI.nextBtn.disabled = false }
+
+    function nextQuestion(){ current += 1; if(current < activeSet.length) renderQuestion(); else showResult(); }
+
+    function showResult(){ stopTimer(); UI.questionText.textContent = 'Quiz complete!'; UI.choices.innerHTML = '';
+      const percent = activeSet.length? Math.round((score/activeSet.length)*100):0;
+      UI.choices.innerHTML = `\n        <div style="padding:12px 14px; border-radius:10px; background:rgba(0,0,0,0.3)">\n          <div style='font-size:18px; font-weight:700'>Score: ${score} / ${activeSet.length} (${percent}%)</div>\n          <div style='color:var(--muted); margin-top:8px'>Detailed breakdown available in session summary.</div>\n        </div>`;
+      // save high score
+      const prevHigh = Number(localStorage.getItem('quiz_high')||0); if(score > prevHigh){ saveHighScore(score) }
+      // session summary
+      const correctCount = answersLog.filter(a=>a.selected===a.correct).length;
+      UI.sessionSummary.innerHTML = `Answered: ${answersLog.length} • Correct: ${correctCount} • Wrong: ${answersLog.length-correctCount}`;
+    }
+
+    // Timer
+    function startTimer(sec){ UI.timeLeft.textContent = sec; let left = sec; timerId = setInterval(()=>{ left -= 1; UI.timeLeft.textContent = left; if(left<=0){ clearInterval(timerId); timerId=null; autoSkip() } }, 1000) }
+    function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null } }
+    function autoSkip(){ // mark as wrong and show correct answer
+      const q = activeSet[current]; collectAnswer(q, -1, false);
+      Array.from(UI.choices.children).forEach((el,i)=>{ const explainEl = el.querySelector('.explain'); if(i === q.answer){ el.classList.add('correct'); explainEl.style.display='block'; explainEl.textContent = q.explain || '' } });
+      UI.nextBtn.disabled = false;
+    }
+
+    // Utilities
+    function shuffleArray(a){ const b = a.slice(); for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]] } return b }
+    function escapeHtml(s){ return String(s).replace(/[&<>"]+/g, (m)=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])) }
+
+    // File loader
+    UI.fileLoader.addEventListener('change', (ev)=>{
+      const f = ev.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = e=>{
+        try{ const parsed = JSON.parse(e.target.result); if(!Array.isArray(parsed)) throw new Error('JSON must be an array of questions'); // validate basic shape
+          parsed.forEach((q, idx)=>{ if(!q.q || !Array.isArray(q.choices) || typeof q.answer !== 'number') throw new Error('Each question must have q, choices[], answer'); q.id = q.id || Date.now()+idx });
+          questionBank = parsed; saveBank(); setBankCount(); alert('Loaded '+parsed.length+' questions. Click Start (Next) to begin.');
+        }catch(err){ alert('Failed to load JSON: '+err.message) }
+      }; reader.readAsText(f);
+    });
+
+    // Add sample
+    UI.addSample.addEventListener('click', ()=>{ // append sample but avoid duplicates by ID
+      const base = Date.now(); sampleQuestions.forEach((s,i)=> questionBank.push({...s, id: base + i})); saveBank(); setBankCount(); alert('Sample questions added. Click Next to start.'); });
+
+    UI.resetBank.addEventListener('click', ()=>{ if(confirm('Reset question bank? This removes all stored questions.')){ questionBank = []; saveBank(); setBankCount(); alert('Question bank cleared.'); } });
+
+    UI.toggleShuffle.addEventListener('click', ()=>{ shuffle = !shuffle; UI.toggleShuffle.textContent = 'Shuffle: ' + (shuffle? 'On' : 'Off'); });
+
+    UI.nextBtn.addEventListener('click', ()=>{ if(current >= activeSet.length-1){ nextQuestion(); } else { nextQuestion() } });
+    UI.restartBtn.addEventListener('click', ()=>{ if(activeSet.length) startQuiz(); else resetSession(); });
+
+    UI.showSummary.addEventListener('click', ()=>{ // show detailed breakdown
+      if(answersLog.length===0){ alert('No answers recorded yet.'); return }
+      const lines = answersLog.map(a => `Q: ${a.q} — Selected: ${a.selected>=0?String.fromCharCode(65+a.selected):'—'} • Correct: ${String.fromCharCode(65+a.correct)}`);
+      alert('Session breakdown:\n\n' + lines.join('\n\n'));
+    });
+
+    UI.clearScores.addEventListener('click', ()=>{ if(confirm('Clear high score?')){ localStorage.removeItem('quiz_high'); loadHighScore(); alert('High score cleared.') } });
+
+    // Manual add
+    document.getElementById('addQBtn').addEventListener('click', ()=>{ addManual(false) });
+    document.getElementById('addAndStart').addEventListener('click', ()=>{ addManual(true) });
+    function addManual(startAfter){ const qtxt = document.getElementById('newQText').value.trim(); const o1=document.getElementById('opt1').value.trim(); const o2=document.getElementById('opt2').value.trim(); const o3=document.getElementById('opt3').value.trim(); const o4=document.getElementById('opt4').value.trim(); const explain=document.getElementById('explain').value.trim(); if(!qtxt||!o1||!o2||!o3||!o4){ alert('Please fill question and 4 options (option 1 is treated as correct).'); return }
+      const id = Date.now(); questionBank.push({id, q:qtxt, choices:[o1,o2,o3,o4], answer:0, explain}); saveBank(); setBankCount(); if(startAfter) startQuiz(); alert('Question added.'); // clear inputs
+      document.getElementById('newQText').value=''; document.getElementById('opt1').value=''; document.getElementById('opt2').value=''; document.getElementById('opt3').value=''; document.getElementById('opt4').value=''; document.getElementById('explain').value=''; }
+
+    // keyboard shortcuts for 1-4 and Enter for next
+    window.addEventListener('keydown', (e)=>{
+      if(e.key >= '1' && e.key <= '4'){ const idx = Number(e.key)-1; const btn = UI.choices.children[idx]; if(btn) btn.click(); }
+      if(e.key === 'Enter'){ if(!UI.nextBtn.disabled) UI.nextBtn.click(); }
+    });
+
+    // init
+    loadBank(); loadHighScore(); setBankCount(); resetSession();
+
+    // small UX: if there are questions in bank, prepare auto-start when pressing Next
+    UI.nextBtn.addEventListener('click', ()=>{ if(activeSet.length===0) startQuiz(); });
+
+    // expose for debugging
+    window.__quiz = {questionBank, startQuiz, renderQuestion};
+  </script>
+</body>
+</html>
